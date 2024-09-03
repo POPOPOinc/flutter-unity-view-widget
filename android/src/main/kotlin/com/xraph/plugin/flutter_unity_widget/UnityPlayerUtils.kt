@@ -159,7 +159,7 @@ class UnityPlayerUtils {
          */
         @JvmStatic
         fun onUnityMessage(message: String) {
-            Log.d("UnityListener", "total listeners are ${mUnityEventListeners.size}")
+            // Log.d("UnityListener", "total listeners are ${mUnityEventListeners.size}")
             for (listener in mUnityEventListeners) {
                 try {
                     listener.onMessage(message)
