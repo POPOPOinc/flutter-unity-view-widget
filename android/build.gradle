@@ -2,14 +2,14 @@ group 'com.xraph.plugin.flutter_unity_widget'
 version '4.0-SNAPSHOT'
 
 buildscript {
-    ext.kotlin_version = '1.6.20'
+    ext.kotlin_version = '1.8.20'
     repositories {
         google()
         mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.0'
+        classpath 'com.android.tools.build:gradle:7.0.4'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -33,9 +33,8 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 33
 
-    // backwards compatible for old gradle versions without namespace
     if (project.android.hasProperty("namespace")) {
         namespace 'com.xraph.plugin.flutter_unity_widget'
     }
@@ -45,14 +44,19 @@ android {
     }
     defaultConfig {
         minSdkVersion 19
+        targetSdkVersion 33
     }
     lintOptions {
         disable 'InvalidPackage'
     }
 
     compileOptions {
-        sourceCompatibility 1.8
-        targetCompatibility 1.8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
     }
 }
 
