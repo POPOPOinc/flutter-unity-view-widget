@@ -126,8 +126,11 @@ public class FLTUnityWidgetController: NSObject, FLTUnityOptionsSink, FlutterPla
         let unityView = GetUnityPlayerUtils().ufw?.appController()?.rootView
         if _rootView == unityView?.superview {
             if globalControllers.isEmpty {
-                unityView?.removeFromSuperview()
-                unityView?.superview?.layoutIfNeeded()
+                // Instead of removing the Unity view from the hierarchy completely,
+                // we move it to a hidden container to keep Unity's rendering loop active.
+                // Removing the view from hierarchy causes Unity's main thread to stop
+                // because it has no surface to render to.
+                GetUnityPlayerUtils().moveUnityViewToHiddenContainer(unityView: unityView)
             } else {
                 globalControllers.last?.reattachView()
             }

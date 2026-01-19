@@ -245,8 +245,13 @@ class FlutterUnityWidgetController(
 
     override fun onPause(owner: LifecycleOwner) {
         Log.d(LOG_TAG, "onPause")
+        // Note: We no longer automatically pause Unity here.
+        // This lifecycle callback is tied to the Activity lifecycle, not Flutter widget lifecycle.
+        // When pushing a new Flutter page, this callback may be triggered even though the app
+        // is not going to background, causing Unity's main thread to stop unexpectedly.
+        // Unity pause/resume should be controlled explicitly from Flutter side via
+        // WidgetsBindingObserver.didChangeAppLifecycleState or unity#pausePlayer/unity#resumePlayer.
         UnityPlayerUtils.viewStaggered = true
-        UnityPlayerUtils.pause()
     }
 
     override fun onDestroy(owner: LifecycleOwner) {

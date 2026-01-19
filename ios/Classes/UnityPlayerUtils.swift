@@ -52,6 +52,10 @@ func UnityFrameworkLoad() -> UnityFramework? {
 /*********************************** GLOBAL FUNCS & VARS START**************************************/
 public var globalControllers: Array<FLTUnityWidgetController> = [FLTUnityWidgetController]()
 
+// Hidden container to keep Unity view in hierarchy when no controllers are active.
+// This prevents Unity's main thread from stopping due to view removal.
+private var hiddenUnityContainer: UIView? = nil
+
 private var unityPlayerUtils: UnityPlayerUtils? = nil
 func GetUnityPlayerUtils() -> UnityPlayerUtils {
 
@@ -216,6 +220,31 @@ var sharedApplication: UIApplication?
     func resume() {
         self.ufw?.pause(false)
         self._isUnityPaused = false
+    }
+    
+    // Move Unity view to a hidden container instead of removing from hierarchy.
+    // This keeps Unity's rendering loop active and prevents the main thread from stopping.
+    func moveUnityViewToHiddenContainer(unityView: UIView?) {
+        guard let unityView = unityView else { return }
+        
+        // Create hidden container if it doesn't exist
+        if hiddenUnityContainer == nil {
+            hiddenUnityContainer = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+            hiddenUnityContainer?.isHidden = true
+            hiddenUnityContainer?.clipsToBounds = true
+            
+            // Add to the app's key window to keep it in the view hierarchy
+            if let keyWindow = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
+                keyWindow.addSubview(hiddenUnityContainer!)
+            }
+        }
+        
+        // Move Unity view to hidden container
+        if let superview = unityView.superview {
+            unityView.removeFromSuperview()
+            superview.layoutIfNeeded()
+        }
+        hiddenUnityContainer?.addSubview(unityView)
     }
 
     // Unoad unity player
