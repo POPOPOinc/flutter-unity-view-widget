@@ -222,29 +222,51 @@ var sharedApplication: UIApplication?
         self._isUnityPaused = false
     }
     
-    // Move Unity view to a hidden container instead of removing from hierarchy.
+    // Move Unity view back to Unity's own window instead of removing from hierarchy.
     // This keeps Unity's rendering loop active and prevents the main thread from stopping.
-    func moveUnityViewToHiddenContainer(unityView: UIView?) {
+    // Unity's window is always present (at a lower window level than Flutter's window),
+    // so this ensures Unity continues rendering even when no Flutter controllers are active.
+    func moveUnityViewToUnityWindow(unityView: UIView?) {
+        guard let unityView = unityView else { return }
+        
+        // Get Unity's own window - this is set up during Unity initialization
+        // and is always present at a lower window level than Flutter's window.
+        guard let unityWindow = self.ufw?.appController()?.window else {
+            // Fallback: if Unity's window is not available, use hidden container approach
+            moveUnityViewToHiddenContainer(unityView: unityView)
+            return
+        }
+        
+        // Move Unity view back to Unity's own window.
+        // Adding to a new parent automatically removes from the old parent,
+        // avoiding the orphan state that could stop Unity's rendering.
+        unityWindow.addSubview(unityView)
+        unityView.frame = unityWindow.bounds
+    }
+    
+    // Fallback: Move Unity view to a hidden container if Unity's window is not available.
+    private func moveUnityViewToHiddenContainer(unityView: UIView?) {
         guard let unityView = unityView else { return }
         
         // Create hidden container if it doesn't exist
         if hiddenUnityContainer == nil {
-            hiddenUnityContainer = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-            hiddenUnityContainer?.isHidden = true
-            hiddenUnityContainer?.clipsToBounds = true
+            // Use screen-sized frame to ensure Unity has a proper rendering surface.
+            let screenBounds = UIScreen.main.bounds
+            hiddenUnityContainer = UIView(frame: screenBounds)
             
-            // Add to the app's key window to keep it in the view hierarchy
+            // Keep alpha = 1 to ensure Unity continues rendering.
+            // Position at the back of the window so it's not visible to the user.
+            hiddenUnityContainer?.isUserInteractionEnabled = false
+            
+            // Add to the app's key window at the back
             if let keyWindow = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
-                keyWindow.addSubview(hiddenUnityContainer!)
+                keyWindow.insertSubview(hiddenUnityContainer!, at: 0)
             }
         }
         
-        // Move Unity view to hidden container
-        if let superview = unityView.superview {
-            unityView.removeFromSuperview()
-            superview.layoutIfNeeded()
-        }
+        // Move Unity view to hidden container.
         hiddenUnityContainer?.addSubview(unityView)
+        unityView.frame = hiddenUnityContainer?.bounds ?? UIScreen.main.bounds
     }
 
     // Unoad unity player

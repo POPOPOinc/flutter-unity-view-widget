@@ -95,13 +95,13 @@ public class FLTUnityWidgetController: NSObject, FLTUnityOptionsSink, FlutterPla
         startUnityIfNeeded()
 
         let unityView = GetUnityPlayerUtils().ufw?.appController()?.rootView
-        if let superview = unityView?.superview {
-            unityView?.removeFromSuperview()
-            superview.layoutIfNeeded()
-        }
-
+        
+        // Don't explicitly remove from superview - adding to a new parent
+        // automatically removes from the old parent, avoiding the orphan state
+        // that could stop Unity's rendering loop.
         if let unityView = unityView {
             _rootView.addSubview(unityView)
+            unityView.frame = _rootView.bounds
             _rootView.layoutIfNeeded()
             self.channel?.invokeMethod("events#onViewReattached", arguments: "")
         }
@@ -127,10 +127,11 @@ public class FLTUnityWidgetController: NSObject, FLTUnityOptionsSink, FlutterPla
         if _rootView == unityView?.superview {
             if globalControllers.isEmpty {
                 // Instead of removing the Unity view from the hierarchy completely,
-                // we move it to a hidden container to keep Unity's rendering loop active.
+                // we move it back to Unity's own window to keep Unity's rendering loop active.
+                // Unity's window is always present at a lower window level than Flutter's window.
                 // Removing the view from hierarchy causes Unity's main thread to stop
                 // because it has no surface to render to.
-                GetUnityPlayerUtils().moveUnityViewToHiddenContainer(unityView: unityView)
+                GetUnityPlayerUtils().moveUnityViewToUnityWindow(unityView: unityView)
             } else {
                 globalControllers.last?.reattachView()
             }
