@@ -95,6 +95,9 @@ class MethodChannelUnityWidget extends UnityWidgetPlatform {
       case "events#onUnityCreated":
         _unityStreamController.add(UnityCreatedEvent(unityId, call.arguments));
         break;
+      case "events#onBackPressed":
+        _unityStreamController.add(UnityBackPressedEvent(unityId, call.arguments));
+        break;
       default:
         throw UnimplementedError("Unimplemented ${call.method} method");
     }
@@ -143,6 +146,11 @@ class MethodChannelUnityWidget extends UnityWidgetPlatform {
   @override
   Stream<UnitySceneLoadedEvent> onUnitySceneLoaded({required int unityId}) {
     return _events(unityId).whereType<UnitySceneLoadedEvent>();
+  }
+
+  @override
+  Stream<UnityBackPressedEvent> onBackPressed({required int unityId}) {
+    return _events(unityId).whereType<UnityBackPressedEvent>();
   }
 
   @override

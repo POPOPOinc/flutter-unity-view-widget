@@ -25,3 +25,5 @@ typedef void UnityMessageCallback(dynamic handler);
 typedef void UnitySceneChangeCallback(SceneLoaded? message);
 
 typedef void UnityUnloadCallback();
+
+typedef void UnityBackPressedCallback();

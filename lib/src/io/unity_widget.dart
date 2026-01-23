@@ -65,6 +65,7 @@ class UnityWidget extends StatefulWidget {
     this.placeholder,
     this.useAndroidViewSurface = false,
     this.onUnitySceneLoaded,
+    this.onBackPressed,
     this.uiLevel = 1,
     this.borderRadius = BorderRadius.zero,
     this.layoutDirection,
@@ -86,6 +87,9 @@ class UnityWidget extends StatefulWidget {
 
   ///Event fires when the [UnityWidget] unity player gets unloaded.
   final UnityUnloadCallback? onUnityUnloaded;
+
+  ///Event fires when the Android back button is pressed (Android 13+ only).
+  final UnityBackPressedCallback? onBackPressed;
 
   final Set<Factory<OneSequenceGestureRecognizer>>? gestureRecognizers;
 

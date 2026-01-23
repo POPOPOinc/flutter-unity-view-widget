@@ -18,7 +18,8 @@ class MobileUnityWidgetController extends UnityWidgetController {
   /// used for cancel the subscription
   StreamSubscription? _onUnityMessageSub,
       _onUnitySceneLoadedSub,
-      _onUnityUnloadedSub;
+      _onUnityUnloadedSub,
+      _onBackPressedSub;
 
   MobileUnityWidgetController._(this._unityWidgetState,
       {required this.unityId}) {
@@ -65,6 +66,12 @@ class MobileUnityWidgetController extends UnityWidgetController {
       _onUnityUnloadedSub = UnityWidgetPlatform.instance
           .onUnityUnloaded(unityId: unityId)
           .listen((_) => _unityWidgetState.widget.onUnityUnloaded!());
+    }
+
+    if (_unityWidgetState.widget.onBackPressed != null) {
+      _onBackPressedSub = UnityWidgetPlatform.instance
+          .onBackPressed(unityId: unityId)
+          .listen((_) => _unityWidgetState.widget.onBackPressed!());
     }
   }
 
@@ -200,10 +207,12 @@ class MobileUnityWidgetController extends UnityWidgetController {
     _onUnityMessageSub?.cancel();
     _onUnitySceneLoadedSub?.cancel();
     _onUnityUnloadedSub?.cancel();
+    _onBackPressedSub?.cancel();
 
     _onUnityMessageSub = null;
     _onUnitySceneLoadedSub = null;
     _onUnityUnloadedSub = null;
+    _onBackPressedSub = null;
   }
 
   void dispose() {

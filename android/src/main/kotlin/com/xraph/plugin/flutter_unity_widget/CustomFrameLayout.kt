@@ -1,12 +1,9 @@
 package com.xraph.plugin.flutter_unity_widget
 
-import android.annotation.SuppressLint
-import android.os.Build
 import android.util.Log
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
-import android.window.OnBackInvokedDispatcher
 import com.xraph.plugin.flutter_unity_widget.UnityPlayerUtils
 import android.content.Context
 import android.content.res.Configuration
@@ -58,14 +55,6 @@ public class CustomFrameLayout : FrameLayout  {
             return false
         }
         return super.dispatchKeyEvent(event)
-    }
-
-    // UnityがOnBackInvokedCallbackを登録しないようにする
-    // これにより、バックボタンイベントがFlutterに渡される
-    @SuppressLint("NewApi")
-    override fun findOnBackInvokedDispatcher(): OnBackInvokedDispatcher? {
-        Log.i(LOG_TAG, "findOnBackInvokedDispatcher called, returning null to prevent Unity from registering callback")
-        return null
     }
 
 }

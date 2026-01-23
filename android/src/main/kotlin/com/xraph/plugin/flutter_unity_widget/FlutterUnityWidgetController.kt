@@ -14,6 +14,8 @@ import android.view.Choreographer
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.unity3d.player.IUnityPlayerLifecycleEvents
@@ -49,6 +51,8 @@ class FlutterUnityWidgetController(
     private var disposed: Boolean = false
     private var attached: Boolean = false
     private var loadedCallbackPending: Boolean = false
+    private var backCallback: OnBackInvokedCallback? = null
+    private var backCallbackRegistered: Boolean = false
 
     init {
         UnityPlayerUtils.controllers.add(this)
@@ -324,6 +328,7 @@ class FlutterUnityWidgetController(
     }
 
     private fun detachView() {
+        unregisterBackCallback()
         UnityPlayerUtils.controllers.remove(this)
         methodChannel.setMethodCallHandler(null)
         UnityPlayerUtils.removePlayer(this)
@@ -346,6 +351,9 @@ class FlutterUnityWidgetController(
         UnityPlayerUtils.addUnityViewToGroup(view)
         UnityPlayerUtils.focus()
         attached = true
+        
+        // バックボタンのコールバックを登録
+        registerBackCallback()
     }
 
     // DO NOT CHANGE THIS FUNCTION
@@ -383,6 +391,41 @@ class FlutterUnityWidgetController(
     private fun postFrameCallback(f: Runnable) {
         Choreographer.getInstance()
                 .postFrameCallback { f.run() }
+    }
+
+    // バックボタンのコールバックを登録する (Android 13+)
+    @SuppressLint("NewApi")
+    private fun registerBackCallback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !backCallbackRegistered) {
+            val activity = getActivity(null)
+            if (activity != null) {
+                backCallback = OnBackInvokedCallback {
+                    Log.i(LOG_TAG, "OnBackInvokedCallback triggered, forwarding to Flutter")
+                    Handler(Looper.getMainLooper()).post {
+                        methodChannel.invokeMethod("events#onBackPressed", null)
+                    }
+                }
+                activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_OVERLAY,
+                    backCallback!!
+                )
+                backCallbackRegistered = true
+                Log.i(LOG_TAG, "Back callback registered with PRIORITY_OVERLAY")
+            }
+        }
+    }
+
+    // バックボタンのコールバックを解除する
+    @SuppressLint("NewApi")
+    private fun unregisterBackCallback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && backCallbackRegistered && backCallback != null) {
+            val activity = getActivity(null)
+            if (activity != null) {
+                activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(backCallback!!)
+                backCallbackRegistered = false
+                Log.i(LOG_TAG, "Back callback unregistered")
+            }
+        }
     }
     //#endregion
 }
