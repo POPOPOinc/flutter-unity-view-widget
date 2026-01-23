@@ -3,6 +3,7 @@ package com.xraph.plugin.flutter_unity_widget
 import android.annotation.SuppressLint
 import android.util.Log
 import android.view.InputDevice
+import android.view.KeyEvent
 import android.view.MotionEvent
 import com.xraph.plugin.flutter_unity_widget.UnityPlayerUtils
 import android.content.Context
@@ -45,6 +46,16 @@ public class CustomFrameLayout : FrameLayout  {
         } else {
             return super.dispatchTouchEvent(event)
         }
+    }
+
+    // バックボタンのイベントをUnityで消費せず、Flutterに渡す
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            Log.i(LOG_TAG, "Back button pressed, passing to Flutter")
+            // バックボタンのイベントを消費せず、親に渡す
+            return false
+        }
+        return super.dispatchKeyEvent(event)
     }
 
 }
