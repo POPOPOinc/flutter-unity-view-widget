@@ -336,11 +336,8 @@ class FlutterUnityWidgetController(
 
 
     private fun attachToView() {
-        if (UnityPlayerUtils.unityFrameLayout == null) {
-            Log.w(LOG_TAG, "attachToView: unityFrameLayout is null, skipping")
-            return
-        }
-        Log.i(LOG_TAG, "attachToView: Attaching unity to view")
+        if (UnityPlayerUtils.unityFrameLayout == null) return
+        Log.d(LOG_TAG, "Attaching unity to view")
 
         if (UnityPlayerUtils.unityFrameLayout!!.parent != null) {
             (UnityPlayerUtils.unityFrameLayout!!.parent as ViewGroup).removeView(UnityPlayerUtils.unityFrameLayout)
@@ -399,13 +396,11 @@ class FlutterUnityWidgetController(
     // バックボタンのコールバックを登録する (Android 13+)
     @SuppressLint("NewApi")
     private fun registerBackCallback() {
-        Log.i(LOG_TAG, "registerBackCallback called, SDK_INT=${Build.VERSION.SDK_INT}, TIRAMISU=${Build.VERSION_CODES.TIRAMISU}, backCallbackRegistered=$backCallbackRegistered")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !backCallbackRegistered) {
             val activity = getActivity(null)
-            Log.i(LOG_TAG, "Activity for back callback: $activity")
             if (activity != null) {
                 backCallback = OnBackInvokedCallback {
-                    Log.i(LOG_TAG, "OnBackInvokedCallback triggered, forwarding to Flutter")
+                    Log.d(LOG_TAG, "OnBackInvokedCallback triggered, forwarding to Flutter")
                     Handler(Looper.getMainLooper()).post {
                         methodChannel.invokeMethod("events#onBackPressed", null)
                     }
@@ -416,15 +411,11 @@ class FlutterUnityWidgetController(
                         backCallback!!
                     )
                     backCallbackRegistered = true
-                    Log.i(LOG_TAG, "Back callback registered with PRIORITY_OVERLAY successfully")
+                    Log.d(LOG_TAG, "Back callback registered with PRIORITY_OVERLAY")
                 } catch (e: Exception) {
                     Log.e(LOG_TAG, "Failed to register back callback: ${e.message}", e)
                 }
-            } else {
-                Log.w(LOG_TAG, "Activity is null, cannot register back callback")
             }
-        } else {
-            Log.i(LOG_TAG, "Skipping back callback registration: SDK_INT < TIRAMISU or already registered")
         }
     }
 
