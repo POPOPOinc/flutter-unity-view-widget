@@ -7,6 +7,7 @@
 
 import Foundation
 import UnityFramework
+import os.log
 
 private var unity_warmed_up = false
 // Hack to work around iOS SDK 4.3 linker problem
@@ -78,6 +79,62 @@ var sharedApplication: UIApplication?
     private var _isUnityPaused = false
     private var _isUnityReady = false
     private var _isUnityLoaded = false
+
+    // Logger for Unity lifecycle events
+    private let logger = Logger(subsystem: "com.xraph.plugin.flutter_unity_widget", category: "UnityLifecycle")
+
+    // File logging setup
+    private let logQueue = DispatchQueue(label: "com.xraph.plugin.flutter_unity_widget.logQueue")
+    private var logFilePath: String? {
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        return documentsDirectory.appendingPathComponent("app_logs.txt").path
+    }
+
+    // Write log to app_logs.txt file
+    private func writeToLogFile(_ message: String) {
+        guard let filePath = logFilePath else {
+            return
+        }
+
+        logQueue.async {
+            // Format timestamp to match Flutter's DateTime.now().toString() format
+            // "2026-02-04 18:21:17.828440"
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSS"
+            formatter.timeZone = TimeZone.current
+            let timestamp = formatter.string(from: Date())
+            let logEntry = "\(timestamp)[Info][iOS-Unity]\(message)\n\n"
+
+            if let data = logEntry.data(using: .utf8) {
+                if FileManager.default.fileExists(atPath: filePath) {
+                    if let fileHandle = FileHandle(forWritingAtPath: filePath) {
+                        fileHandle.seekToEndOfFile()
+                        fileHandle.write(data)
+                        fileHandle.closeFile()
+                    }
+                } else {
+                    // File doesn't exist yet, create it
+                    try? data.write(to: URL(fileURLWithPath: filePath), options: .atomic)
+                }
+            }
+        }
+    }
+
+    // Unified logging method (Logger + print + file)
+    private func logInfo(_ message: String) {
+        logger.info("\(message)")
+        print(message)
+        writeToLogFile(message)
+    }
+
+    // Unified warning logging method
+    private func logWarning(_ message: String) {
+        logger.warning("\(message)")
+        print(message)
+        writeToLogFile(message)
+    }
 
     func initUnity() {
         if (self.unityIsInitiallized()) {
@@ -174,16 +231,24 @@ var sharedApplication: UIApplication?
         let application = UIApplication.shared
 
         if notification?.name == UIApplication.willResignActiveNotification {
+            logInfo("🔴 [Unity Lifecycle] applicationWillResignActive - About to call Unity pause")
             unityAppController?.applicationWillResignActive(application)
+            logInfo("🔴 [Unity Lifecycle] applicationWillResignActive - Completed")
         } else if notification?.name == UIApplication.didEnterBackgroundNotification {
+            logInfo("🔵 [Unity Lifecycle] applicationDidEnterBackground")
             unityAppController?.applicationDidEnterBackground(application)
         } else if notification?.name == UIApplication.willEnterForegroundNotification {
+            logInfo("🟢 [Unity Lifecycle] applicationWillEnterForeground")
             unityAppController?.applicationWillEnterForeground(application)
         } else if notification?.name == UIApplication.didBecomeActiveNotification {
+            logInfo("🟢 [Unity Lifecycle] applicationDidBecomeActive - About to call Unity resume")
             unityAppController?.applicationDidBecomeActive(application)
+            logInfo("🟢 [Unity Lifecycle] applicationDidBecomeActive - Completed")
         } else if notification?.name == UIApplication.willTerminateNotification {
+            logInfo("⚫️ [Unity Lifecycle] applicationWillTerminate")
             unityAppController?.applicationWillTerminate(application)
         } else if notification?.name == UIApplication.didReceiveMemoryWarningNotification {
+            logWarning("⚠️ [Unity Lifecycle] applicationDidReceiveMemoryWarning")
             unityAppController?.applicationDidReceiveMemoryWarning(application)
         }
     }
@@ -208,14 +273,18 @@ var sharedApplication: UIApplication?
     }
     // Pause unity player
     func pause() {
+        logInfo("🔴 [Unity Control] pause() called - Current state: isPaused=\(self._isUnityPaused)")
         self.ufw?.pause(true)
         self._isUnityPaused = true
+        logInfo("🔴 [Unity Control] pause() completed - New state: isPaused=\(self._isUnityPaused)")
     }
 
     // Resume unity player
     func resume() {
+        logInfo("🟢 [Unity Control] resume() called - Current state: isPaused=\(self._isUnityPaused)")
         self.ufw?.pause(false)
         self._isUnityPaused = false
+        logInfo("🟢 [Unity Control] resume() completed - New state: isPaused=\(self._isUnityPaused)")
     }
 
     // Unoad unity player
