@@ -8,6 +8,7 @@
 import Foundation
 import UnityFramework
 import os.log
+import MachO
 
 private var unity_warmed_up = false
 // Hack to work around iOS SDK 4.3 linker problem
@@ -80,82 +81,57 @@ var sharedApplication: UIApplication?
     private var _isUnityReady = false
     private var _isUnityLoaded = false
 
-    // Logger for Unity lifecycle events
-    private let logger = Logger(subsystem: "com.xraph.plugin.flutter_unity_widget", category: "UnityLifecycle")
+    // Use shared logger
+    private let logger = UnityLogger.shared
 
-    // File logging setup
-    private let logQueue = DispatchQueue(label: "com.xraph.plugin.flutter_unity_widget.logQueue")
-    private var logFilePath: String? {
-        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        return documentsDirectory.appendingPathComponent("app_logs.txt").path
-    }
-
-    // Write log to app_logs.txt file
-    private func writeToLogFile(_ message: String) {
-        guard let filePath = logFilePath else {
-            return
-        }
-
-        logQueue.async {
-            // Format timestamp to match Flutter's DateTime.now().toString() format
-            // "2026-02-04 18:21:17.828440"
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSS"
-            formatter.timeZone = TimeZone.current
-            let timestamp = formatter.string(from: Date())
-            let logEntry = "\(timestamp)[Info][iOS-Unity]\(message)\n\n"
-
-            if let data = logEntry.data(using: .utf8) {
-                if FileManager.default.fileExists(atPath: filePath) {
-                    if let fileHandle = FileHandle(forWritingAtPath: filePath) {
-                        fileHandle.seekToEndOfFile()
-                        fileHandle.write(data)
-                        fileHandle.closeFile()
-                    }
-                } else {
-                    // File doesn't exist yet, create it
-                    try? data.write(to: URL(fileURLWithPath: filePath), options: .atomic)
-                }
-            }
-        }
-    }
-
-    // Unified logging method (Logger + print + file)
+    // Convenience logging methods
     private func logInfo(_ message: String) {
-        logger.info("\(message)")
-        print(message)
-        writeToLogFile(message)
+        logger.info(message, category: "iOS-Unity")
     }
 
-    // Unified warning logging method
     private func logWarning(_ message: String) {
-        logger.warning("\(message)")
-        print(message)
-        writeToLogFile(message)
+        logger.warning(message, category: "iOS-Unity")
     }
 
     func initUnity() {
+        self.logInfo("[UnityPlayerUtils] 🚀 START initUnity - Thread: \(Thread.current)")
+
         if (self.unityIsInitiallized()) {
+            self.logInfo("[UnityPlayerUtils] ⚠️ Unity already initialized, showing window")
             self.ufw?.showUnityWindow()
             return
         }
 
+        self.logInfo("[UnityPlayerUtils] 📦 Loading UnityFramework...")
         self.ufw = UnityFrameworkLoad()
+        self.logInfo("[UnityPlayerUtils] 📦 UnityFramework loaded: \(self.ufw != nil)")
+        if self.ufw?.appController() == nil {
+            self.ufw?.setExecuteHeader(#dsohandle.assumingMemoryBound(to: mach_header_64.self))
+        }
 
         self.ufw?.setDataBundleId("com.unity3d.framework")
+        self.logInfo("[UnityPlayerUtils] 📦 DataBundleId set")
 
+        self.logInfo("[UnityPlayerUtils] 🔗 Registering UnityListener...")
         registerUnityListener()
+
+        self.logInfo("[UnityPlayerUtils] 🎮 BEFORE runEmbedded() - This is the critical point")
         self.ufw?.runEmbedded(withArgc: gArgc, argv: gArgv, appLaunchOpts: appLaunchOpts)
+        self.logInfo("[UnityPlayerUtils] 🎮 AFTER runEmbedded() - PlayerLoop may not be running yet!")
 
         if self.ufw?.appController() != nil {
+            self.logInfo("[UnityPlayerUtils] 🎯 AppController available, setting up handlers")
             controller = self.ufw?.appController()
             controller?.unityMessageHandler = self.unityMessageHandlers
             controller?.unitySceneLoadedHandler = self.unitySceneLoadedHandlers
             self.ufw?.appController()?.window?.windowLevel = UIWindow.Level(UIWindow.Level.normal.rawValue - 1)
+            self.logInfo("[UnityPlayerUtils] 🎯 AppController setup completed")
+        } else {
+            self.logWarning("[UnityPlayerUtils] ⚠️ AppController is nil after runEmbedded!")
         }
+
         _isUnityLoaded = true
+        self.logInfo("[UnityPlayerUtils] ✅ END initUnity - _isUnityLoaded = true (but PlayerLoop might not be ready yet)")
     }
 
     // check if unity is initiallized
@@ -169,35 +145,38 @@ var sharedApplication: UIApplication?
 
     // Create new unity player
     func createPlayer(completed: @escaping (_ view: UIView?) -> Void) {
+        self.logInfo("[UnityPlayerUtils] 📞 createPlayer() CALLED - Thread: \(Thread.current)")
+        self.logInfo("[UnityPlayerUtils] 📞 Current state: isInitialized=\(self.unityIsInitiallized()), isReady=\(self._isUnityReady)")
+
         if self.unityIsInitiallized() && self._isUnityReady {
+            self.logInfo("[UnityPlayerUtils] ✅ Unity already ready, returning rootView immediately")
             completed(controller?.rootView)
             return
         }
 
+        self.logInfo("[UnityPlayerUtils] 🔔 Setting up UnityReady notification observer (but NOT actually waiting for it!)")
         NotificationCenter.default.addObserver(forName: NSNotification.Name("UnityReady"), object: nil, queue: OperationQueue.main, using: { note in
+            self.logInfo("[UnityPlayerUtils] 🔔 ⚠️ UnityReady notification received (this should happen BEFORE completed() is called)")
             self._isUnityReady = true
             completed(controller?.rootView)
         })
 
         DispatchQueue.main.async {
-//            if (sharedApplication == nil) {
-//                sharedApplication = UIApplication.shared
-//            }
-
-            // Always keep Flutter window on top
-//            let flutterUIWindow = sharedApplication?.keyWindow
-//            flutterUIWindow?.windowLevel = UIWindow.Level(UIWindow.Level.normal.rawValue + 1) // Always keep Flutter window in top
-//            sharedApplication?.keyWindow?.windowLevel = UIWindow.Level(UIWindow.Level.normal.rawValue + 1)
-
+            self.logInfo("[UnityPlayerUtils] 🔄 On main thread, about to call initUnity()")
             self.initUnity()
+            self.logInfo("[UnityPlayerUtils] 🔄 initUnity() returned")
 
             unity_warmed_up = true
             self._isUnityReady = true
             self._isUnityLoaded = true
+            self.logInfo("[UnityPlayerUtils] ⚠️ CRITICAL: Set _isUnityReady = true WITHOUT waiting for PlayerLoop to start!")
 
             self.listenAppState()
+            self.logInfo("[UnityPlayerUtils] 🎧 App state listener registered")
 
+            self.logInfo("[UnityPlayerUtils] 🏁 Calling completed() - PlayerLoop may NOT be running yet!")
             completed(controller?.rootView)
+            self.logInfo("[UnityPlayerUtils] 🏁 completed() callback executed")
         }
 
     }
@@ -274,17 +253,25 @@ var sharedApplication: UIApplication?
     // Pause unity player
     func pause() {
         logInfo("🔴 [Unity Control] pause() called - Current state: isPaused=\(self._isUnityPaused)")
-        self.ufw?.pause(true)
-        self._isUnityPaused = true
-        logInfo("🔴 [Unity Control] pause() completed - New state: isPaused=\(self._isUnityPaused)")
+        if !self._isUnityPaused, let ufw = self.ufw {
+            ufw.pause(true)
+            self._isUnityPaused = true
+            logInfo("🔴 [Unity Control] pause() completed - New state: isPaused=\(self._isUnityPaused)")
+        } else {
+            logInfo("🟢 [Unity Control] pause() skipped because ufw is nil or _isUnityPaused is true")
+        }
     }
 
     // Resume unity player
     func resume() {
         logInfo("🟢 [Unity Control] resume() called - Current state: isPaused=\(self._isUnityPaused)")
-        self.ufw?.pause(false)
-        self._isUnityPaused = false
-        logInfo("🟢 [Unity Control] resume() completed - New state: isPaused=\(self._isUnityPaused)")
+        if self._isUnityPaused, let ufw = self.ufw {
+            ufw.pause(false)
+            self._isUnityPaused = false
+            logInfo("🟢 [Unity Control] resume() completed - New state: isPaused=\(self._isUnityPaused)")
+        } else {
+            logInfo("🟢 [Unity Control] resume() skipped because ufw is nil or _isUnityPaused is false")
+        }
     }
 
     // Unoad unity player

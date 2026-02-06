@@ -14,8 +14,20 @@ public class FLTUnityWidgetController: NSObject, FLTUnityOptionsSink, FlutterPla
     private var viewId: Int64 = 0
     private var channel: FlutterMethodChannel?
     private weak var registrar: (NSObjectProtocol & FlutterPluginRegistrar)?
-    
+
     private var _disposed = false
+
+    // Use shared logger
+    private let logger = UnityLogger.shared
+
+    // Convenience logging methods
+    private func logInfo(_ message: String) {
+        logger.info(message, category: "iOS-Controller")
+    }
+
+    private func logWarning(_ message: String) {
+        logger.warning(message, category: "iOS-Controller")
+    }
 
     init(
         frame: CGRect,
@@ -38,6 +50,7 @@ public class FLTUnityWidgetController: NSObject, FLTUnityOptionsSink, FlutterPla
     }
 
     func methodHandler(_ call: FlutterMethodCall, result: FlutterResult) {
+        logInfo("[FLTUnityWidgetController] 📞 methodHandler() CALLED - called method: \(call.method)")
         if call.method == "unity#dispose" {
             self.dispose()
             result(nil)
@@ -49,7 +62,9 @@ public class FLTUnityWidgetController: NSObject, FLTUnityOptionsSink, FlutterPla
                 let _isUnloaded = GetUnityPlayerUtils().isUnityLoaded()
                 result(_isUnloaded)
             } else if call.method == "unity#createUnityPlayer" {
-                startUnityIfNeeded()
+                startUnityIfNeeded {
+                    // Unity初期化完了後の処理が必要であればここに追加
+                }
                 result(nil)
             } else if call.method == "unity#isPaused" {
                 let _isPaused = GetUnityPlayerUtils().isUnityPaused()
@@ -85,37 +100,96 @@ public class FLTUnityWidgetController: NSObject, FLTUnityOptionsSink, FlutterPla
         return _rootView;
     }
 
-    private func startUnityIfNeeded() {
-        GetUnityPlayerUtils().createPlayer(completed: { [self] (view: UIView?) in
+    private func startUnityIfNeeded(onCompleted: @escaping () -> Void) {
+        logInfo("[FLTUnityWidgetController] 🎬 startUnityIfNeeded() CALLED")
+        logInfo("[FLTUnityWidgetController] 🎬 About to call createPlayer() - this is ASYNC!")
 
+        GetUnityPlayerUtils().createPlayer(completed: { [self] (view: UIView?) in
+            self.logInfo("[FLTUnityWidgetController] 🎬 createPlayer completed() callback received")
+            self.logInfo("[FLTUnityWidgetController] 🎬 Received view: \(view != nil ? "not nil" : "nil")")
+
+            // Unityプレイヤーの初期化が完了したので、完了ハンドラを呼び出す
+            self.logInfo("[FLTUnityWidgetController] 🎬 Calling onCompleted handler...")
+            onCompleted()
+            self.logInfo("[FLTUnityWidgetController] 🎬 onCompleted handler finished")
         })
+
+        logInfo("[FLTUnityWidgetController] 🎬 createPlayer() call returned (but NOT completed yet!)")
     }
 
     func attachView() {
-        startUnityIfNeeded()
+        logInfo("[FLTUnityWidgetController] 🔗 attachView() START - Thread: \(Thread.current)")
+        logInfo("[FLTUnityWidgetController] 🔗 Unity state: isInitialized=\(GetUnityPlayerUtils().unityIsInitiallized()), isPaused=\(GetUnityPlayerUtils().isUnityPaused())")
 
+        logInfo("[FLTUnityWidgetController] 🔗 Step 1: Calling startUnityIfNeeded()...")
+        startUnityIfNeeded { [weak self] in
+            guard let self = self else { return }
+
+            self.logInfo("[FLTUnityWidgetController] 🔗 Step 1: startUnityIfNeeded() COMPLETED!")
+
+            // 既に呼ばれていたらスキップ
+            if alreadySuperviewAttached() {
+                self.logInfo("[FLTUnityWidgetController] 🎬 completed() already called once, skipping this invocation")
+                return
+            }
+
+            self.logInfo("[FLTUnityWidgetController] 🔗 Step 2: Getting rootView from Unity...")
+            let unityView = GetUnityPlayerUtils().ufw?.appController()?.rootView
+            self.logInfo("[FLTUnityWidgetController] 🔗 Step 2: rootView = \(unityView != nil ? "not nil" : "nil")")
+
+            if let superview = unityView?.superview {
+                self.logInfo("[FLTUnityWidgetController] 🔗 Step 3: Removing from existing superview...")
+                unityView?.removeFromSuperview()
+                superview.layoutIfNeeded()
+                self.logInfo("[FLTUnityWidgetController] 🔗 Step 3: Removed from superview")
+            } else {
+                self.logInfo("[FLTUnityWidgetController] 🔗 Step 3: No existing superview")
+            }
+
+            if let unityView = unityView {
+                self.logInfo("[FLTUnityWidgetController] 🔗 Step 4: Adding unityView to _rootView...")
+                self._rootView.addSubview(unityView)
+                self._rootView.layoutIfNeeded()
+                self.logInfo("[FLTUnityWidgetController] 🔗 Step 4: Added to _rootView and layout updated")
+
+                self.logInfo("[FLTUnityWidgetController] 🔗 Step 5: Invoking onViewReattached event...")
+                self.channel?.invokeMethod("events#onViewReattached", arguments: "")
+                self.logInfo("[FLTUnityWidgetController] 🔗 Step 5: onViewReattached event sent")
+            } else {
+                self.logWarning("[FLTUnityWidgetController] ⚠️ Step 4: unityView is nil, cannot add to _rootView!")
+            }
+
+            self.logInfo("[FLTUnityWidgetController] 🔗 Step 6: Calling resume()...")
+            GetUnityPlayerUtils().resume()
+            self.logInfo("[FLTUnityWidgetController] 🔗 Step 6: resume() called")
+
+            self.logInfo("[FLTUnityWidgetController] 🔗 attachView() END")
+        }
+
+        logInfo("[FLTUnityWidgetController] 🔗 attachView() initiated, waiting for Unity initialization...")
+    }
+
+    func alreadySuperviewAttached() -> Bool {
         let unityView = GetUnityPlayerUtils().ufw?.appController()?.rootView
-        if let superview = unityView?.superview {
-            unityView?.removeFromSuperview()
-            superview.layoutIfNeeded()
-        }
+        let superview = unityView?.superview
 
-        if let unityView = unityView {
-            _rootView.addSubview(unityView)
-            _rootView.layoutIfNeeded()
-            self.channel?.invokeMethod("events#onViewReattached", arguments: "")
-        }
-        GetUnityPlayerUtils().resume()
+        logInfo("[FLTUnityWidgetController] 🔄 Current superview: \(superview != nil ? "exists" : "nil"), _rootView: \(_rootView)")
+        return superview == _rootView
     }
 
     func reattachView() {
-        let unityView = GetUnityPlayerUtils().ufw?.appController()?.rootView
-        let superview = unityView?.superview
-        if superview != _rootView {
+        logInfo("[FLTUnityWidgetController] 🔄 reattachView() CALLED")
+        
+        if alreadySuperviewAttached() {
+            logInfo("[FLTUnityWidgetController] 🔄 Superview matches, skipping attachView()")
+        } else {
+            logInfo("[FLTUnityWidgetController] 🔄 Superview mismatch, calling attachView()")
             attachView()
         }
 
+        logInfo("[FLTUnityWidgetController] 🔄 Calling resume()...")
         GetUnityPlayerUtils().resume()
+        logInfo("[FLTUnityWidgetController] 🔄 reattachView() END")
     }
 
     func removeViewIfNeeded() {
