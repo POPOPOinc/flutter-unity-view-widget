@@ -19,6 +19,12 @@ class FlutterUnityWidgetBuilder : FlutterUnityWidgetOptionsSink {
                 binaryMessenger,
                 lifecycle
         )
+
+        controller.setFullscreenEnabled(options.fullscreenEnabled)
+        controller.setHideStatusBar(options.hideStatus)
+        controller.setRunImmediately(options.runImmediately)
+        controller.setUnloadOnDispose(options.unloadOnDispose)
+
         controller.bootstrap()
 
         return controller
