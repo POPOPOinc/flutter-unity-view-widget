@@ -1,6 +1,6 @@
 package com.xraph.plugin.flutter_unity_widget
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
 /* 
 The following Unity versions expect the mUnityPlayer property on the main activity: 
@@ -14,7 +14,7 @@ Implement FlutterUnityActivity or the interface to fix these plugins.
 https://github.com/juicycleff/flutter-unity-view-widget/pull/908
 */
 
-open class FlutterUnityActivity: FlutterActivity() {
+open class FlutterUnityActivity: FlutterFragmentActivity() {
     @JvmField
     var mUnityPlayer: java.lang.Object? = null;
 }
