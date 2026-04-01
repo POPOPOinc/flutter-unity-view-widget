@@ -8,7 +8,7 @@ version: 6000.0.0-alpha
 homepage: https://github.com/juicycleff/flutter-unity-view-widget/tree/master
 
 environment:
-  sdk: ">=2.16.0 <4.0.0"
+  sdk: ">=3.1.0 <4.0.0"
   flutter: ">=3.3.0"
 
 dependencies:
@@ -21,7 +21,6 @@ dependencies:
   plugin_platform_interface: ^2.1.2
   webview_flutter: ^4.0.0
   webview_flutter_web: ^0.2.2
-#  ffi: ^1.2.1 // required for windows support
 
 dev_dependencies:
   flutter_test:

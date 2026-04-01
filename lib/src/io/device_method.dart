@@ -12,7 +12,6 @@ import '../helpers/events.dart';
 import '../helpers/misc.dart';
 import '../helpers/types.dart';
 import 'unity_widget_platform.dart';
-import 'windows_unity_widget_view.dart';
 
 class MethodChannelUnityWidget extends UnityWidgetPlatform {
   // Every method call passes the int unityId
@@ -163,10 +162,6 @@ class MethodChannelUnityWidget extends UnityWidgetPlatform {
     if (useAndroidViewSurf != null) useAndroidViewSurface = useAndroidViewSurf;
 
     final Map<String, dynamic> creationParams = unityOptions;
-
-    if (defaultTargetPlatform == TargetPlatform.windows) {
-      return WindowsUnityWidgetView();
-    }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       if (!useAndroidViewSurface) {

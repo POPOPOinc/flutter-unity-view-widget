@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -9,6 +10,8 @@ import '../helpers/misc.dart';
 import 'device_method.dart';
 import 'mobile_unity_widget_controller.dart';
 import 'unity_widget_platform.dart';
+import 'windows_unity_widget_controller.dart';
+import 'windows_unity_widget_view.dart';
 
 int _nextUnityCreationId = 0;
 
@@ -174,6 +177,12 @@ class _UnityWidgetState extends State<UnityWidget> {
           Text('Placeholder mode enabled, no native code will be called');
     }
 
+    if (Platform.isWindows) {
+      return WindowsUnityWidgetView(
+        onUnityWindowReady: _onWindowsUnityReady,
+      );
+    }
+
     return UnityWidgetPlatform.instance.buildViewWithTextDirection(
       _unityId,
       _onPlatformViewCreated,
@@ -185,6 +194,18 @@ class _UnityWidgetState extends State<UnityWidget> {
       useAndroidViewSurf: widget.useAndroidViewSurface,
       unitySrcUrl: widget.webUrl,
     );
+  }
+
+  void _onWindowsUnityReady(int id) {
+    final controller = WindowsUnityWidgetController._(unityId: id);
+    _controller = controller;
+    widget.onUnityCreated(controller);
+
+    if (widget.printSetupLog) {
+      log('*********************************************');
+      log('** flutter unity controller setup complete **');
+      log('*********************************************');
+    }
   }
 
   Future<void> _onPlatformViewCreated(int id) async {
