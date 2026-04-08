@@ -3,6 +3,7 @@ import 'windows_unity_widget_bindings.dart';
 
 class WindowsUnityWidgetController extends UnityWidgetController {
   final int unityId;
+  bool _paused = false;
 
   WindowsUnityWidgetController._({required this.unityId});
 
@@ -10,7 +11,7 @@ class WindowsUnityWidgetController extends UnityWidgetController {
   Future<bool?>? isReady() => Future.value(true);
 
   @override
-  Future<bool?>? isPaused() => Future.value(false);
+  Future<bool?>? isPaused() => Future.value(_paused);
 
   @override
   Future<bool?>? isLoaded() => Future.value(true);
@@ -24,12 +25,14 @@ class WindowsUnityWidgetController extends UnityWidgetController {
   @override
   Future<void>? pause() {
     NativeBindings.pauseUnityWindow(unityId);
+    _paused = true;
     return Future.value();
   }
 
   @override
   Future<void>? resume() {
     NativeBindings.resumeUnityWindow(unityId);
+    _paused = false;
     return Future.value();
   }
 
