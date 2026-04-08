@@ -200,7 +200,31 @@ namespace flutter_unity_widget {
 
   void NativeWindowContainer::StartUnityThread(HINSTANCE h_instance, HWND target_window, int32_t id, HANDLE exit_event)
   {
-    std::thread([this, h_instance, target_window, exit_event]()
+    // UnityPlayer.dll のディレクトリから *_Data フォルダを探す
+    std::wstring data_folder;
+    {
+      wchar_t dll_path[MAX_PATH];
+      if (::GetModuleFileNameW(unity_module_, dll_path, MAX_PATH)) {
+        ::PathRemoveFileSpecW(dll_path);
+
+        std::wstring search_pattern = std::wstring(dll_path) + L"\\*_Data";
+        WIN32_FIND_DATAW find_data;
+        HANDLE hFind = ::FindFirstFileW(search_pattern.c_str(), &find_data);
+        if (hFind != INVALID_HANDLE_VALUE) {
+          do {
+            if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+              data_folder = std::wstring(dll_path) + L"\\" + find_data.cFileName;
+              break;
+            }
+          } while (::FindNextFileW(hFind, &find_data));
+          ::FindClose(hFind);
+        }
+      }
+      DebugLog("[flutter_unity_widget] Data folder: %ls",
+          data_folder.empty() ? L"(not found)" : data_folder.c_str());
+    }
+
+    std::thread([this, h_instance, target_window, exit_event, data_folder]()
     {
       auto unityMain = (UnityMainFunc)GetProcAddress(unity_module_, "UnityMain");
       if (!unityMain) {
@@ -212,7 +236,10 @@ namespace flutter_unity_widget {
         L"-parentHWND " + std::to_wstring((uintptr_t)target_window);
       DebugLog("[flutter_unity_widget] UnityMain starting with cmdLine: %ls",
           cmdLine.c_str());
-      unityMain(h_instance, nullptr, const_cast<LPWSTR>(cmdLine.c_str()), SW_SHOWNOACTIVATE);
+      unityMain(h_instance,
+                reinterpret_cast<HINSTANCE>(data_folder.empty() ? nullptr : data_folder.c_str()),
+                const_cast<LPWSTR>(cmdLine.c_str()),
+                SW_SHOWNOACTIVATE);
       ::SetEvent(exit_event);
     }).detach();
 
