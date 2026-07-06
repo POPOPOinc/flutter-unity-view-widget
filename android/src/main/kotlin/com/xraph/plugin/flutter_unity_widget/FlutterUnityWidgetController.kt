@@ -73,8 +73,17 @@ class FlutterUnityWidgetController(
             createPlayer()
             attachToView()
         } else {
-            // attach unity to controller
+            // ====== [REPRO] 黒画面再現コード START ======
+            // 仮説: スペース再入室時、onViewAttachedToWindow の resume→pause→resume
+            //       サイクル（GPU描画面の再バインド）をスキップすることで、
+            //       TLHC SurfaceTexture が正しく EGL コンテキストに接続されず
+            //       Unity の描画出力が Flutter コンポジタに届かなくなる。
+            //       影響端末 (Zenfone 9, AQUOS zero2) では 100% 黒画面を再現、
+            //       BG→FG で onResume → refocusUnity() が走り復旧することも確認できる。
+            Log.w(LOG_TAG, "[REPRO] Re-use path: skipping onViewAttachedToWindow recovery cycle")
+            UnityPlayerUtils.skipNextAttachRecovery = true
             attachToView()
+            // ====== [REPRO] 黒画面再現コード END ======
         }
     }
 

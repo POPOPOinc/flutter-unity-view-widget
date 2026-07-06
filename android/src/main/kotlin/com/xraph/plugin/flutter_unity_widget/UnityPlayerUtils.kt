@@ -31,12 +31,19 @@ class UnityPlayerUtils {
         var unityPaused: Boolean = false
         var unityLoaded: Boolean = false
         var viewStaggered: Boolean = false
+        // [REPRO] trueの場合、次回の onViewAttachedToWindow で resume-pause-resume サイクルをスキップする
+        var skipNextAttachRecovery: Boolean = false
 
         private val mUnityEventListeners = CopyOnWriteArraySet<UnityEventListener>()
 
         // In 2023+ we can no longer override the UnityPlayer Framelayout (onAttachedToWindow).
         private val unityAttachListener = object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(view: View) {
+                if (skipNextAttachRecovery) {
+                    Log.w(LOG_TAG, "onAttachedToWindow [REPRO] resume-pause-resume recovery SKIPPED")
+                    skipNextAttachRecovery = false
+                    return
+                }
                 Log.i(LOG_TAG, "onAttachedToWindow")
                 UnityPlayerUtils.resume()
                 UnityPlayerUtils.pause()
