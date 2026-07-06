@@ -73,8 +73,8 @@ class FlutterUnityWidgetController(
             createPlayer()
             attachToView()
         } else {
-            // attach unity to controller
             attachToView()
+            refocusUnity()
         }
     }
 
