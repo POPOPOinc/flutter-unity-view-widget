@@ -67,15 +67,15 @@ class FlutterUnityWidgetController(
         UnityPlayerUtils.addUnityEventListener(this)
 
         if(UnityPlayerUtils.unityPlayer == null) {
-            Log.i(LOG_TAG, "[DIAG] init: path=NEW_PLAYER")
+            sendDiagLog("init: path=NEW_PLAYER")
             createPlayer()
             refocusUnity()
         } else if(!UnityPlayerUtils.unityLoaded) {
-            Log.i(LOG_TAG, "[DIAG] init: path=LOADED_FALSE paused=${UnityPlayerUtils.unityPaused} staggered=${UnityPlayerUtils.viewStaggered}")
+            sendDiagLog("init: path=LOADED_FALSE paused=${UnityPlayerUtils.unityPaused} staggered=${UnityPlayerUtils.viewStaggered}")
             createPlayer()
             attachToView()
         } else {
-            Log.i(LOG_TAG, "[DIAG] init: path=REUSE paused=${UnityPlayerUtils.unityPaused} staggered=${UnityPlayerUtils.viewStaggered} controllers=${UnityPlayerUtils.controllers.size} parent=${UnityPlayerUtils.unityFrameLayout?.parent?.javaClass?.simpleName} viewAttached=${view.isAttachedToWindow}")
+            sendDiagLog("init: path=REUSE paused=${UnityPlayerUtils.unityPaused} staggered=${UnityPlayerUtils.viewStaggered} controllers=${UnityPlayerUtils.controllers.size} parent=${UnityPlayerUtils.unityFrameLayout?.parent?.javaClass?.simpleName} viewAttached=${view.isAttachedToWindow}")
             attachToView()
         }
     }
@@ -91,7 +91,7 @@ class FlutterUnityWidgetController(
     }
 
     override fun dispose() {
-        Log.i(LOG_TAG, "[DIAG] dispose: id=$id attached=$attached paused=${UnityPlayerUtils.unityPaused} controllersBeforeRemove=${UnityPlayerUtils.controllers.size}")
+        sendDiagLog("dispose: id=$id attached=$attached paused=${UnityPlayerUtils.unityPaused} controllersBeforeRemove=${UnityPlayerUtils.controllers.size}")
         UnityPlayerUtils.removeUnityEventListener(this)
         if (disposed) {
             return
@@ -236,10 +236,10 @@ class FlutterUnityWidgetController(
     }
 
     override fun onResume(owner: LifecycleOwner) {
-        Log.i(LOG_TAG, "[DIAG] onResume: staggered=${UnityPlayerUtils.viewStaggered} loaded=${UnityPlayerUtils.unityLoaded} paused=${UnityPlayerUtils.unityPaused} attached=$attached")
+        sendDiagLog("onResume: staggered=${UnityPlayerUtils.viewStaggered} loaded=${UnityPlayerUtils.unityLoaded} paused=${UnityPlayerUtils.unityPaused} attached=$attached")
         reattachToView()
         if(UnityPlayerUtils.viewStaggered && UnityPlayerUtils.unityLoaded) {
-            Log.i(LOG_TAG, "[DIAG] onResume: recovery triggered (createPlayer+refocusUnity)")
+            sendDiagLog("onResume: recovery triggered (createPlayer+refocusUnity)")
             this.createPlayer()
             refocusUnity()
             UnityPlayerUtils.viewStaggered = false
@@ -247,7 +247,7 @@ class FlutterUnityWidgetController(
     }
 
     override fun onPause(owner: LifecycleOwner) {
-        Log.i(LOG_TAG, "[DIAG] onPause: setting staggered=true, calling pause()")
+        sendDiagLog("onPause: setting staggered=true, calling pause()")
         UnityPlayerUtils.viewStaggered = true
         UnityPlayerUtils.pause()
     }
@@ -266,7 +266,7 @@ class FlutterUnityWidgetController(
     //#region Member Methods
     fun bootstrap() {
         val currentState = this.lifecycleProvider.getLifecycle().currentState
-        Log.i(LOG_TAG, "[DIAG] bootstrap: lifecycleState=$currentState staggered=${UnityPlayerUtils.viewStaggered} paused=${UnityPlayerUtils.unityPaused}")
+        sendDiagLog("bootstrap: lifecycleState=$currentState staggered=${UnityPlayerUtils.viewStaggered} paused=${UnityPlayerUtils.unityPaused}")
         this.lifecycleProvider.getLifecycle().addObserver(this)
     }
 
@@ -337,10 +337,10 @@ class FlutterUnityWidgetController(
 
     private fun attachToView() {
         if (UnityPlayerUtils.unityFrameLayout == null) {
-            Log.w(LOG_TAG, "[DIAG] attachToView: unityFrameLayout is null, aborting")
+            sendDiagLog("attachToView: unityFrameLayout is null, aborting")
             return
         }
-        Log.i(LOG_TAG, "[DIAG] attachToView: oldParent=${UnityPlayerUtils.unityFrameLayout!!.parent?.javaClass?.simpleName} viewAttachedToWindow=${view.isAttachedToWindow} viewWindowToken=${view.windowToken != null}")
+        sendDiagLog("attachToView: oldParent=${UnityPlayerUtils.unityFrameLayout!!.parent?.javaClass?.simpleName} viewAttachedToWindow=${view.isAttachedToWindow} viewWindowToken=${view.windowToken != null}")
 
         if (UnityPlayerUtils.unityFrameLayout!!.parent != null) {
             (UnityPlayerUtils.unityFrameLayout!!.parent as ViewGroup).removeView(UnityPlayerUtils.unityFrameLayout)
@@ -365,7 +365,7 @@ class FlutterUnityWidgetController(
 
     fun reattachToView() {
         val needsReattach = UnityPlayerUtils.unityFrameLayout!!.parent != view
-        Log.i(LOG_TAG, "[DIAG] reattachToView: needsReattach=$needsReattach")
+        sendDiagLog("reattachToView: needsReattach=$needsReattach")
         if (needsReattach) {
             this.attachToView()
             Handler(Looper.getMainLooper()).post {
@@ -393,6 +393,19 @@ class FlutterUnityWidgetController(
     private fun postFrameCallback(f: Runnable) {
         Choreographer.getInstance()
                 .postFrameCallback { f.run() }
+    }
+
+    fun sendDiagLog(message: String) {
+        Log.i(LOG_TAG, "[DIAG] $message")
+        sendDiagLogToFlutter("[DIAG] $message")
+    }
+
+    fun sendDiagLogToFlutter(message: String) {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                methodChannel.invokeMethod("events#onDiagLog", message)
+            } catch (_: Exception) {}
+        }
     }
     //#endregion
 }

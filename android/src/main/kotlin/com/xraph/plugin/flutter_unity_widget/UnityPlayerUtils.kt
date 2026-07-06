@@ -37,28 +37,28 @@ class UnityPlayerUtils {
         // In 2023+ we can no longer override the UnityPlayer Framelayout (onAttachedToWindow).
         private val unityAttachListener = object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(view: View) {
-                Log.i(LOG_TAG, "[DIAG] onAttachedToWindow: paused=$unityPaused loaded=$unityLoaded staggered=$viewStaggered parent=${view.parent?.javaClass?.simpleName}")
+                sendDiagLog("onAttachedToWindow: paused=$unityPaused loaded=$unityLoaded staggered=$viewStaggered parent=${view.parent?.javaClass?.simpleName}")
                 UnityPlayerUtils.resume()
                 UnityPlayerUtils.pause()
                 UnityPlayerUtils.resume()
-                Log.i(LOG_TAG, "[DIAG] onAttachedToWindow: triple cycle done, paused=$unityPaused")
+                sendDiagLog("onAttachedToWindow: triple cycle done, paused=$unityPaused")
             }
 
             override fun onViewDetachedFromWindow(view: View) {
-                Log.i(LOG_TAG, "[DIAG] onDetachedFromWindow: paused=$unityPaused loaded=$unityLoaded")
+                sendDiagLog("onDetachedFromWindow: paused=$unityPaused loaded=$unityLoaded")
             }
         }
 
         fun focus() {
             try {
                 val focusResult = unityFrameLayout!!.requestFocus()
-                Log.i(LOG_TAG, "[DIAG] focus: requestFocus=$focusResult paused=$unityPaused")
+                sendDiagLog("focus: requestFocus=$focusResult paused=$unityPaused")
                 unityPlayer!!.windowFocusChanged(focusResult)
                 unityPlayer!!.resume()
                 unityPaused = false
-                Log.i(LOG_TAG, "[DIAG] focus: resume called, paused=$unityPaused")
+                sendDiagLog("focus: resume called, paused=$unityPaused")
             } catch (e: Exception) {
-                Log.e(LOG_TAG, "[DIAG] focus: EXCEPTION $e")
+                sendDiagLog("focus: EXCEPTION $e")
             }
         }
 
@@ -219,13 +219,13 @@ class UnityPlayerUtils {
 
         fun removePlayer(controller: FlutterUnityWidgetController) {
             val isParent = unityFrameLayout!!.parent == controller.view
-            Log.i(LOG_TAG, "[DIAG] removePlayer: isParent=$isParent remainingControllers=${controllers.size} paused=$unityPaused")
+            sendDiagLog("removePlayer: isParent=$isParent remainingControllers=${controllers.size} paused=$unityPaused")
             if (isParent) {
                 if (controllers.isEmpty()) {
                     (controller.view as FrameLayout).removeView(unityFrameLayout)
                     pause()
                     shakeActivity()
-                    Log.i(LOG_TAG, "[DIAG] removePlayer: removed+paused, paused=$unityPaused staggered=$viewStaggered")
+                    sendDiagLog("removePlayer: removed+paused, paused=$unityPaused staggered=$viewStaggered")
                 } else {
                     controllers[controllers.size - 1].reattachToView()
                 }
@@ -241,6 +241,11 @@ class UnityPlayerUtils {
 //             val layoutParams = ViewGroup.LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT)
 //            val layoutParams = ViewGroup.LayoutParams(570, 770)
             group.addView(unityFrameLayout, layoutParams)
+        }
+
+        fun sendDiagLog(message: String) {
+            Log.i(LOG_TAG, "[DIAG] $message")
+            controllers.firstOrNull()?.sendDiagLogToFlutter("[DIAG] $message")
         }
 
         fun addUnityViewToBackground() {

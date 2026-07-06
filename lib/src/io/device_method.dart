@@ -18,6 +18,8 @@ class MethodChannelUnityWidget extends UnityWidgetPlatform {
   // Every method call passes the int unityId
   late final Map<int, MethodChannel> _channels = {};
 
+  static void Function(String message)? onNativeDiagLog;
+
   /// Set [UnityWidgetFlutterPlatform] to use [AndroidViewSurface] to build the Google Maps widget.
   ///
   /// This implementation uses hybrid composition to render the Unity Widget
@@ -94,6 +96,11 @@ class MethodChannelUnityWidget extends UnityWidgetPlatform {
         break;
       case "events#onUnityCreated":
         _unityStreamController.add(UnityCreatedEvent(unityId, call.arguments));
+        break;
+      case "events#onDiagLog":
+        onNativeDiagLog?.call(call.arguments as String);
+        break;
+      case "events#onViewReattached":
         break;
       default:
         throw UnimplementedError("Unimplemented ${call.method} method");

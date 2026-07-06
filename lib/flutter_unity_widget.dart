@@ -7,3 +7,4 @@ export 'src/facade_widget.dart'
 export 'src/helpers/events.dart';
 export 'src/helpers/misc.dart';
 export 'src/helpers/types.dart';
+export 'src/io/device_method.dart' show MethodChannelUnityWidget;
