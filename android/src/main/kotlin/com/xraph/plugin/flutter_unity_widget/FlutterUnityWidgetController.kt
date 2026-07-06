@@ -67,29 +67,16 @@ class FlutterUnityWidgetController(
         UnityPlayerUtils.addUnityEventListener(this)
 
         if(UnityPlayerUtils.unityPlayer == null) {
+            Log.i(LOG_TAG, "[DIAG] init: path=NEW_PLAYER")
             createPlayer()
             refocusUnity()
         } else if(!UnityPlayerUtils.unityLoaded) {
+            Log.i(LOG_TAG, "[DIAG] init: path=LOADED_FALSE paused=${UnityPlayerUtils.unityPaused} staggered=${UnityPlayerUtils.viewStaggered}")
             createPlayer()
             attachToView()
         } else {
-            // ====== [REPRO v4] 黒画面再現コード START ======
-            // 仮説: removePlayer() でスペース退室時に Unity は pause() される。
-            // 再入室時の re-use path で attachToView() → focus() → resume() が
-            // 呼ばれるが、特定端末では resume() が GPU 描画を有効に再開できない
-            // (EGL コンテキストが stale)。初回パスには refocusUnity() があるが
-            // re-use パスにはない。
-            //
-            // 再現方法: attachToView() 後に即 pause() して Unity 停止を維持し、
-            // onViewAttachedToWindow の recovery もスキップする。
-            // → TLHC surface にフレームが届かず黒画面。
-            // → BG→FG で viewStaggered=true → onResume で
-            //    createPlayer()+refocusUnity() → 復旧。
-            Log.w(LOG_TAG, "[REPRO v4] Re-use path: attach + immediate pause + skip recovery")
-            UnityPlayerUtils.skipNextAttachRecovery = true
+            Log.i(LOG_TAG, "[DIAG] init: path=REUSE paused=${UnityPlayerUtils.unityPaused} staggered=${UnityPlayerUtils.viewStaggered} controllers=${UnityPlayerUtils.controllers.size} parent=${UnityPlayerUtils.unityFrameLayout?.parent?.javaClass?.simpleName} viewAttached=${view.isAttachedToWindow}")
             attachToView()
-            UnityPlayerUtils.pause()
-            // ====== [REPRO v4] 黒画面再現コード END ======
         }
     }
 
@@ -104,7 +91,7 @@ class FlutterUnityWidgetController(
     }
 
     override fun dispose() {
-        Log.d(LOG_TAG, "this controller disposed")
+        Log.i(LOG_TAG, "[DIAG] dispose: id=$id attached=$attached paused=${UnityPlayerUtils.unityPaused} controllersBeforeRemove=${UnityPlayerUtils.controllers.size}")
         UnityPlayerUtils.removeUnityEventListener(this)
         if (disposed) {
             return
@@ -249,9 +236,10 @@ class FlutterUnityWidgetController(
     }
 
     override fun onResume(owner: LifecycleOwner) {
-        Log.d(LOG_TAG, "onResume")
+        Log.i(LOG_TAG, "[DIAG] onResume: staggered=${UnityPlayerUtils.viewStaggered} loaded=${UnityPlayerUtils.unityLoaded} paused=${UnityPlayerUtils.unityPaused} attached=$attached")
         reattachToView()
         if(UnityPlayerUtils.viewStaggered && UnityPlayerUtils.unityLoaded) {
+            Log.i(LOG_TAG, "[DIAG] onResume: recovery triggered (createPlayer+refocusUnity)")
             this.createPlayer()
             refocusUnity()
             UnityPlayerUtils.viewStaggered = false
@@ -259,7 +247,7 @@ class FlutterUnityWidgetController(
     }
 
     override fun onPause(owner: LifecycleOwner) {
-        Log.d(LOG_TAG, "onPause")
+        Log.i(LOG_TAG, "[DIAG] onPause: setting staggered=true, calling pause()")
         UnityPlayerUtils.viewStaggered = true
         UnityPlayerUtils.pause()
     }
@@ -277,6 +265,8 @@ class FlutterUnityWidgetController(
 
     //#region Member Methods
     fun bootstrap() {
+        val currentState = this.lifecycleProvider.getLifecycle().currentState
+        Log.i(LOG_TAG, "[DIAG] bootstrap: lifecycleState=$currentState staggered=${UnityPlayerUtils.viewStaggered} paused=${UnityPlayerUtils.unityPaused}")
         this.lifecycleProvider.getLifecycle().addObserver(this)
     }
 
@@ -346,8 +336,11 @@ class FlutterUnityWidgetController(
 
 
     private fun attachToView() {
-        if (UnityPlayerUtils.unityFrameLayout == null) return
-        Log.d(LOG_TAG, "Attaching unity to view")
+        if (UnityPlayerUtils.unityFrameLayout == null) {
+            Log.w(LOG_TAG, "[DIAG] attachToView: unityFrameLayout is null, aborting")
+            return
+        }
+        Log.i(LOG_TAG, "[DIAG] attachToView: oldParent=${UnityPlayerUtils.unityFrameLayout!!.parent?.javaClass?.simpleName} viewAttachedToWindow=${view.isAttachedToWindow} viewWindowToken=${view.windowToken != null}")
 
         if (UnityPlayerUtils.unityFrameLayout!!.parent != null) {
             (UnityPlayerUtils.unityFrameLayout!!.parent as ViewGroup).removeView(UnityPlayerUtils.unityFrameLayout)
@@ -371,7 +364,9 @@ class FlutterUnityWidgetController(
     }
 
     fun reattachToView() {
-        if (UnityPlayerUtils.unityFrameLayout!!.parent != view) {
+        val needsReattach = UnityPlayerUtils.unityFrameLayout!!.parent != view
+        Log.i(LOG_TAG, "[DIAG] reattachToView: needsReattach=$needsReattach")
+        if (needsReattach) {
             this.attachToView()
             Handler(Looper.getMainLooper()).post {
                 methodChannel.invokeMethod("events#onViewReattached", null)

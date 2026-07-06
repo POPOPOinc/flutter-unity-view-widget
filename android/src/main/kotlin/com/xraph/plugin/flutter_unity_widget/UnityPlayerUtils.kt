@@ -31,36 +31,34 @@ class UnityPlayerUtils {
         var unityPaused: Boolean = false
         var unityLoaded: Boolean = false
         var viewStaggered: Boolean = false
-        // [REPRO] trueの場合、次回の onViewAttachedToWindow で resume-pause-resume サイクルをスキップする
-        var skipNextAttachRecovery: Boolean = false
 
         private val mUnityEventListeners = CopyOnWriteArraySet<UnityEventListener>()
 
         // In 2023+ we can no longer override the UnityPlayer Framelayout (onAttachedToWindow).
         private val unityAttachListener = object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(view: View) {
-                if (skipNextAttachRecovery) {
-                    Log.w(LOG_TAG, "onAttachedToWindow [REPRO] resume-pause-resume recovery SKIPPED")
-                    skipNextAttachRecovery = false
-                    return
-                }
-                Log.i(LOG_TAG, "onAttachedToWindow")
+                Log.i(LOG_TAG, "[DIAG] onAttachedToWindow: paused=$unityPaused loaded=$unityLoaded staggered=$viewStaggered parent=${view.parent?.javaClass?.simpleName}")
                 UnityPlayerUtils.resume()
                 UnityPlayerUtils.pause()
                 UnityPlayerUtils.resume()
+                Log.i(LOG_TAG, "[DIAG] onAttachedToWindow: triple cycle done, paused=$unityPaused")
             }
 
             override fun onViewDetachedFromWindow(view: View) {
-                Log.i(LOG_TAG, "onDetachedFromWindow")
+                Log.i(LOG_TAG, "[DIAG] onDetachedFromWindow: paused=$unityPaused loaded=$unityLoaded")
             }
         }
 
         fun focus() {
             try {
-                unityPlayer!!.windowFocusChanged(unityFrameLayout!!.requestFocus())
+                val focusResult = unityFrameLayout!!.requestFocus()
+                Log.i(LOG_TAG, "[DIAG] focus: requestFocus=$focusResult paused=$unityPaused")
+                unityPlayer!!.windowFocusChanged(focusResult)
                 unityPlayer!!.resume()
+                unityPaused = false
+                Log.i(LOG_TAG, "[DIAG] focus: resume called, paused=$unityPaused")
             } catch (e: Exception) {
-                Log.e(LOG_TAG, e.toString())
+                Log.e(LOG_TAG, "[DIAG] focus: EXCEPTION $e")
             }
         }
 
@@ -220,11 +218,14 @@ class UnityPlayerUtils {
         }
 
         fun removePlayer(controller: FlutterUnityWidgetController) {
-            if (unityFrameLayout!!.parent == controller.view) {
+            val isParent = unityFrameLayout!!.parent == controller.view
+            Log.i(LOG_TAG, "[DIAG] removePlayer: isParent=$isParent remainingControllers=${controllers.size} paused=$unityPaused")
+            if (isParent) {
                 if (controllers.isEmpty()) {
                     (controller.view as FrameLayout).removeView(unityFrameLayout)
                     pause()
                     shakeActivity()
+                    Log.i(LOG_TAG, "[DIAG] removePlayer: removed+paused, paused=$unityPaused staggered=$viewStaggered")
                 } else {
                     controllers[controllers.size - 1].reattachToView()
                 }
