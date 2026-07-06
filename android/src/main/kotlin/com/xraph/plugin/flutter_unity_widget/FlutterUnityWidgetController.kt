@@ -73,14 +73,23 @@ class FlutterUnityWidgetController(
             createPlayer()
             attachToView()
         } else {
-            // ====== [REPRO v3] 黒画面再現コード START ======
-            // 再利用パス: 不透明Activity による onStop 到達後の復帰直後に
-            // PlatformView が生成される状況を再現する。
-            // onViewAttachedToWindow の resume→pause→resume もスキップ。
-            Log.w(LOG_TAG, "[REPRO v3] Re-use path: after onStop lifecycle + skip recovery")
+            // ====== [REPRO v4] 黒画面再現コード START ======
+            // 仮説: removePlayer() でスペース退室時に Unity は pause() される。
+            // 再入室時の re-use path で attachToView() → focus() → resume() が
+            // 呼ばれるが、特定端末では resume() が GPU 描画を有効に再開できない
+            // (EGL コンテキストが stale)。初回パスには refocusUnity() があるが
+            // re-use パスにはない。
+            //
+            // 再現方法: attachToView() 後に即 pause() して Unity 停止を維持し、
+            // onViewAttachedToWindow の recovery もスキップする。
+            // → TLHC surface にフレームが届かず黒画面。
+            // → BG→FG で viewStaggered=true → onResume で
+            //    createPlayer()+refocusUnity() → 復旧。
+            Log.w(LOG_TAG, "[REPRO v4] Re-use path: attach + immediate pause + skip recovery")
             UnityPlayerUtils.skipNextAttachRecovery = true
             attachToView()
-            // ====== [REPRO] 黒画面再現コード END ======
+            UnityPlayerUtils.pause()
+            // ====== [REPRO v4] 黒画面再現コード END ======
         }
     }
 
