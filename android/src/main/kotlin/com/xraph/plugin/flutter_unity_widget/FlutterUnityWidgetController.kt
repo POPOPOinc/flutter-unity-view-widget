@@ -73,12 +73,11 @@ class FlutterUnityWidgetController(
             createPlayer()
             attachToView()
         } else {
-            // ====== [REPRO] 黒画面再現コード START ======
-            // 再利用パス: Activity ライフサイクル遷移直後に PlatformView が生成される
-            // 状況を再現するため、onViewAttachedToWindow の recovery もスキップする。
-            // Dart 側で ReproCallkitActivity 起動 → pause/resume 後に
-            // MoveCurrentSpacePageAction → UnityWidget 生成 → ここに到達する。
-            Log.w(LOG_TAG, "[REPRO] Re-use path: lifecycle disruption + skip recovery")
+            // ====== [REPRO v3] 黒画面再現コード START ======
+            // 再利用パス: 不透明Activity による onStop 到達後の復帰直後に
+            // PlatformView が生成される状況を再現する。
+            // onViewAttachedToWindow の resume→pause→resume もスキップ。
+            Log.w(LOG_TAG, "[REPRO v3] Re-use path: after onStop lifecycle + skip recovery")
             UnityPlayerUtils.skipNextAttachRecovery = true
             attachToView()
             // ====== [REPRO] 黒画面再現コード END ======
