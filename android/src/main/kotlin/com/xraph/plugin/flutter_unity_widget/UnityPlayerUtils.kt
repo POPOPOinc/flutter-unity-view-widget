@@ -31,6 +31,7 @@ class UnityPlayerUtils {
         var unityPaused: Boolean = false
         var unityLoaded: Boolean = false
         var viewStaggered: Boolean = false
+        var sceneEverLoaded: Boolean = false
 
         private val mUnityEventListeners = CopyOnWriteArraySet<UnityEventListener>()
 
@@ -142,6 +143,7 @@ class UnityPlayerUtils {
                 if (unityPlayer != null) {
                     unityPlayer!!.unload()
                     unityLoaded = false
+                    sceneEverLoaded = false
                 }
             } catch (e: Exception) {
                 Log.e(LOG_TAG, e.toString())
@@ -154,6 +156,7 @@ class UnityPlayerUtils {
                     removeUnityAttachListener()
                     unityPlayer!!.destroy()
                     unityLoaded = false
+                    sceneEverLoaded = false
                 }
             } catch (e: Error) {
                 e.message?.let { Log.e(LOG_TAG, it) }
@@ -165,6 +168,9 @@ class UnityPlayerUtils {
          */
         @JvmStatic
         fun onUnitySceneLoaded(name: String, buildIndex: Int, isLoaded: Boolean, isValid: Boolean) {
+            if (isLoaded && isValid) {
+                sceneEverLoaded = true
+            }
             for (listener in mUnityEventListeners) {
                 try {
                     listener.onSceneLoaded(name, buildIndex, isLoaded, isValid)
@@ -226,6 +232,7 @@ class UnityPlayerUtils {
 
         fun reset() {
             unityLoaded = false
+            sceneEverLoaded = false
         }
 
         fun addUnityViewToGroup(group: ViewGroup) {

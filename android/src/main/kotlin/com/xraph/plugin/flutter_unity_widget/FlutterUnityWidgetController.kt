@@ -216,6 +216,7 @@ class FlutterUnityWidgetController(
     override fun onUnityPlayerUnloaded() {
         Log.d(LOG_TAG, "onUnityPlayerUnloaded")
         UnityPlayerUtils.unityLoaded = false
+        UnityPlayerUtils.sceneEverLoaded = false
         Handler(Looper.getMainLooper()).post {
             methodChannel.invokeMethod("events#onUnityUnloaded", true)
         }
@@ -237,8 +238,15 @@ class FlutterUnityWidgetController(
         Log.d(LOG_TAG, "onResume")
         reattachToView()
         if(UnityPlayerUtils.viewStaggered && UnityPlayerUtils.unityLoaded) {
-            this.createPlayer()
-            refocusUnity()
+            if (UnityPlayerUtils.sceneEverLoaded) {
+                this.createPlayer()
+                refocusUnity()
+            } else {
+                // Scene has not rendered yet; a destructive re-attach here races
+                // with the in-progress initial setup and can leave the render
+                // surface blank on some GPUs. Just resume the transient pause.
+                UnityPlayerUtils.resume()
+            }
             UnityPlayerUtils.viewStaggered = false
         }
     }
